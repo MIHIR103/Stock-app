@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 st.set_page_config(layout="wide")
-st.title("🚀 Ultimate Stock Analysis System")
+st.title("🚀 Stock Analysis System")
 
 stock = st.text_input("Enter Stock Symbol", "RELIANCE.NS")
 
@@ -27,65 +27,61 @@ if st.button("Analyze"):
     rs = gain / loss
     data['RSI'] = 100 - (100 / (1 + rs))
 
-    exp1 = data['Close'].ewm(span=12, adjust=False).mean()
-    exp2 = data['Close'].ewm(span=26, adjust=False).mean()
-    data['MACD'] = exp1 - exp2
-
     latest = data.iloc[-1]
 
-    # Metrics
+    # -------- SAFE FUNCTION --------
+    def safe(value):
+        if pd.isna(value):
+            return "N/A"
+        return round(float(value), 2)
+
+    # -------- METRICS --------
     st.subheader("📊 Key Metrics")
+
     col1, col2, col3 = st.columns(3)
+    col1.metric("Price", safe(latest['Close']))
+    col2.metric("RSI", safe(latest['RSI']))
+    col3.metric("MA20", safe(latest['MA20']))
 
-    col1.metric("Price", round(latest['Close'], 2))
-    col2.metric("RSI", round(latest['RSI'], 2) if not pd.isna(latest['RSI']) else "N/A")
-    col3.metric("MA20", round(latest['MA20'], 2) if not pd.isna(latest['MA20']) else "N/A")
+    # -------- SIGNAL --------
+    st.subheader("💡 Signal")
 
-    # Price Action
-    st.subheader("📈 Price Action")
-    if latest['Close'] > latest['MA20']:
-        st.write("📈 Bullish (Above MA20)")
+    rsi = latest['RSI']
+    price = latest['Close']
+    ma20 = latest['MA20']
+
+    if pd.isna(rsi) or pd.isna(ma20):
+        st.warning("Not enough data yet")
+        signal = "WAIT"
     else:
-        st.write("📉 Bearish (Below MA20)")
-
-    # Signal
-    st.subheader("💡 Buy/Sell Signal")
-    signal = "HOLD"
-
-    if not pd.isna(latest['RSI']):
-        if latest['RSI'] < 30 and latest['Close'] > latest['MA20']:
-            signal = "STRONG BUY"
-            st.success(signal)
-        elif latest['RSI'] > 70 and latest['Close'] < latest['MA20']:
-            signal = "STRONG SELL"
-            st.error(signal)
+        if rsi < 30 and price > ma20:
+            st.success("STRONG BUY 📈")
+            signal = "BUY"
+        elif rsi > 70 and price < ma20:
+            st.error("STRONG SELL 📉")
+            signal = "SELL"
         else:
-            st.info("HOLD")
-    else:
-        st.warning("Not enough data")
+            st.info("HOLD 🤝")
+            signal = "HOLD"
 
-    # AI Prediction
+    # -------- AI TREND --------
     st.subheader("🤖 AI Prediction")
+
     recent = data['Close'].tail(10)
-    trend = np.polyfit(range(len(recent)), recent, 1)[0]
 
-    if trend > 0:
-        st.write("📈 Uptrend likely")
+    if len(recent) < 2:
+        st.write("Not enough data")
+        trend = 0
     else:
-        st.write("📉 Downtrend likely")
+        trend = np.polyfit(range(len(recent)), recent, 1)[0]
+        if trend > 0:
+            st.write("📈 Uptrend likely")
+        else:
+            st.write("📉 Downtrend likely")
 
-    # Fundamental
-    st.subheader("💰 Fundamental Analysis")
-    try:
-        info = yf.Ticker(stock).info
-        st.write("P/E:", info.get("trailingPE", "N/A"))
-        st.write("EPS:", info.get("trailingEps", "N/A"))
-        st.write("Market Cap:", info.get("marketCap", "N/A"))
-    except:
-        st.warning("No fundamental data")
+    # -------- CHART --------
+    st.subheader("📊 Chart")
 
-    # Chart
-    st.subheader("📊 Price Chart")
     fig, ax = plt.subplots()
     ax.plot(data['Close'], label="Price")
     ax.plot(data['MA20'], label="MA20")
@@ -93,17 +89,16 @@ if st.button("Analyze"):
     ax.legend()
     st.pyplot(fig)
 
-    # Final Decision
+    # -------- FINAL DECISION --------
     st.subheader("🧠 Final Decision")
-    if signal == "STRONG BUY" and trend > 0:
-        st.success("BUY")
-    elif signal == "STRONG SELL" and trend < 0:
-        st.error("SELL")
+
+    if signal == "BUY" and trend > 0:
+        st.success("✅ FINAL: BUY")
+    elif signal == "SELL" and trend < 0:
+        st.error("❌ FINAL: SELL")
     else:
-        st.info("WAIT")
+        st.info("⚖️ FINAL: WAIT")
 
-    # Summary
+    # -------- SUMMARY --------
     st.subheader("📌 Summary")
-    st.write(f"Trend: {'Uptrend' if trend > 0 else 'Downtrend'}")
     st.write(f"Signal: {signal}")
-
